@@ -25,6 +25,11 @@ export interface SettingsDefaults {
   CLAUDE_MEM_OPENROUTER_APP_NAME: string;
   CLAUDE_MEM_OPENROUTER_MAX_CONTEXT_MESSAGES: string;
   CLAUDE_MEM_OPENROUTER_MAX_TOKENS: string;
+  CLAUDE_MEM_ANTHROPIC_API_KEY: string;
+  CLAUDE_MEM_ANTHROPIC_MODEL: string;
+  CLAUDE_MEM_ANTHROPIC_BASE_URL: string;
+  CLAUDE_MEM_ANTHROPIC_MAX_CONTEXT_MESSAGES: string;
+  CLAUDE_MEM_ANTHROPIC_MAX_TOKENS: string;
   CLAUDE_MEM_DATA_DIR: string;
   CLAUDE_MEM_LOG_LEVEL: string;
   CLAUDE_MEM_PYTHON_VERSION: string;
@@ -106,6 +111,11 @@ export class SettingsDefaultsManager {
     CLAUDE_MEM_OPENROUTER_APP_NAME: 'claude-mem',  // App name for OpenRouter analytics
     CLAUDE_MEM_OPENROUTER_MAX_CONTEXT_MESSAGES: '20',  // Max messages in context window
     CLAUDE_MEM_OPENROUTER_MAX_TOKENS: '100000',  // Max estimated tokens (~100k safety limit)
+    CLAUDE_MEM_ANTHROPIC_API_KEY: '',  // Empty by default; user-supplied via ~/.claude-mem/.env or settings.json
+    CLAUDE_MEM_ANTHROPIC_MODEL: 'claude-sonnet-4-6',  // Default Anthropic model for direct HTTP API provider
+    CLAUDE_MEM_ANTHROPIC_BASE_URL: 'https://api.anthropic.com',  // Anthropic Messages API base URL; supports custom endpoints
+    CLAUDE_MEM_ANTHROPIC_MAX_CONTEXT_MESSAGES: '20',  // Max messages in Anthropic API context window
+    CLAUDE_MEM_ANTHROPIC_MAX_TOKENS: '100000',  // Max estimated tokens (~100k safety limit)
     CLAUDE_MEM_DATA_DIR: join(homedir(), '.claude-mem'),
     CLAUDE_MEM_LOG_LEVEL: 'INFO',
     CLAUDE_MEM_PYTHON_VERSION: '3.13',

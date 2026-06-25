@@ -1,0 +1,224 @@
+---
+title: "Anthropic Provider"
+description: "Use any Anthropic Messages API-compatible endpoint for observation extraction, including proxies, LiteLLM, and third-party services"
+---
+
+# Anthropic Provider
+
+Claude-mem supports using **any Anthropic Messages API-compatible endpoint** as the observation extraction provider. This includes:
+
+- [Anthropic's official API](https://docs.anthropic.com/en/api/messages) (the default)
+- Proxy servers that forward Anthropic-format requests
+- [LiteLLM](https://docs.litellm.ai/docs/proxy/ anthropic) or other gateway services
+- Third-party services implementing the Anthropic Messages API
+
+<Tip>
+**Distinct from Claude SDK**: The `claude` provider uses the Claude Agent SDK subprocess (requires OAuth/subscription auth). The `anthropic` provider uses direct HTTP calls to the Messages API with any API key.
+</Tip>
+
+## Why Use the Anthropic Provider?
+
+- **Custom endpoints**: Connect through proxies, gateways, or internal deployments
+- **LiteLLM compatibility**: Route through LiteLLM for load balancing, caching, or cost management
+- **Third-party providers**: Use any service implementing the Anthropic Messages API format
+- **API key auth**: Works with any service that accepts `x-api-key` authentication
+- **Same quality as Claude**: Uses the same Anthropic Messages API that powers Claude.ai
+
+## Getting Started
+
+### 1. Get an API Key
+
+If using the official Anthropic API, get your key from [console.anthropic.com](https://console.anthropic.com/settings/keys).
+
+For proxies or third-party services, obtain the API key from your provider.
+
+### 2. Configure claude-mem
+
+Edit `~/.claude-mem/settings.json`:
+
+```json
+{
+  "CLAUDE_MEM_PROVIDER": "anthropic",
+  "CLAUDE_MEM_ANTHROPIC_API_KEY": "sk-ant-your-key-here",
+  "CLAUDE_MEM_ANTHROPIC_MODEL": "claude-sonnet-4-6"
+}
+```
+
+### 3. (Optional) Set Custom Base URL
+
+For proxies or third-party endpoints:
+
+```json
+{
+  "CLAUDE_MEM_PROVIDER": "anthropic",
+  "CLAUDE_MEM_ANTHROPIC_API_KEY": "your-key-here",
+  "CLAUDE_MEM_ANTHROPIC_BASE_URL": "https://your-proxy.example.com",
+  "CLAUDE_MEM_ANTHROPIC_MODEL": "claude-sonnet-4-6"
+}
+```
+
+## Configuration
+
+### Settings
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| `CLAUDE_MEM_PROVIDER` | `claude`, `gemini`, `openrouter`, `anthropic` | `claude` | AI provider for observation extraction |
+| `CLAUDE_MEM_ANTHROPIC_API_KEY` | string | — | API key for the Anthropic-compatible endpoint |
+| `CLAUDE_MEM_ANTHROPIC_MODEL` | string | `claude-sonnet-4-6` | Model identifier |
+| `CLAUDE_MEM_ANTHROPIC_BASE_URL` | string | `https://api.anthropic.com` | Base URL for the API endpoint |
+| `CLAUDE_MEM_ANTHROPIC_MAX_CONTEXT_MESSAGES` | number | `20` | Max messages in conversation history |
+| `CLAUDE_MEM_ANTHROPIC_MAX_TOKENS` | number | `100000` | Token budget safety limit |
+
+### Environment Variables
+
+The API key can also be set via environment variables (checked in order):
+
+```bash
+# Priority 1: CLAUDE_MEM_ANTHROPIC_API_KEY in settings.json
+# Priority 2: ANTHROPIC_API_KEY environment variable
+# Priority 3: CLAUDE_MEM_ANTHROPIC_API_KEY environment variable
+```
+
+Base URL environment variable (checked in order):
+
+```bash
+# Priority 1: CLAUDE_MEM_ANTHROPIC_BASE_URL in settings.json
+# Priority 2: ANTHROPIC_BASE_URL environment variable
+```
+
+## LiteLLM Integration
+
+[LiteLLM](https://docs.litellm.ai/docs/proxy/ anthropic) can proxy Anthropic-format requests to 100+ LLMs. Configure claude-mem to use your LiteLLM deployment:
+
+```json
+{
+  "CLAUDE_MEM_PROVIDER": "anthropic",
+  "CLAUDE_MEM_ANTHROPIC_API_KEY": "your-litellm-key",
+  "CLAUDE_MEM_ANTHROPIC_BASE_URL": "http://localhost:4000",
+  "CLAUDE_MEM_ANTHROPIC_MODEL": "gpt-4o"
+}
+```
+
+LiteLLM translates the Anthropic Messages API format to whatever backend you configure (OpenAI, Azure, HuggingFace, etc.).
+
+## Proxy Configuration
+
+Route requests through a custom proxy:
+
+```json
+{
+  "CLAUDE_MEM_PROVIDER": "anthropic",
+  "CLAUDE_MEM_ANTHROPIC_API_KEY": "your-proxy-key",
+  "CLAUDE_MEM_ANTHROPIC_BASE_URL": "https://api.your-proxy.com",
+  "CLAUDE_MEM_ANTHROPIC_MODEL": "claude-sonnet-4-6"
+}
+```
+
+The provider constructs the request URL as `{baseUrl}/v1/messages`.
+
+## API Details
+
+The Anthropic provider uses the [Anthropic Messages API](https://docs.anthropic.com/en/api/messages):
+
+**Endpoint**: `{baseUrl}/v1/messages`
+
+**Headers**:
+```
+x-api-key: {apiKey}
+anthropic-version: 2023-06-01
+Content-Type: application/json
+```
+
+**Request Format**:
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 4096,
+  "temperature": 0.3,
+  "messages": [
+    {"role": "user", "content": "..."}
+  ]
+}
+```
+
+**Response Format**:
+```json
+{
+  "content": [
+    {"type": "text", "text": "..."}
+  ],
+  "usage": {
+    "input_tokens": 1234,
+    "output_tokens": 567
+  }
+}
+```
+
+## Error Classification
+
+The Anthropic provider classifies errors to enable appropriate retry behavior:
+
+| Kind | HTTP Status | Behavior |
+|------|-------------|----------|
+| `transient` | 500–599, 529, network error | Retried with backoff |
+| `rate_limit` | 429 | Retried after `Retry-After` delay |
+| `auth_invalid` | 401, 403 | Not retried |
+| `quota_exhausted` | body contains "quota exceeded" | Not retried |
+| `parse_error` | invalid JSON response | Not retried |
+| `unrecoverable` | 400, context overflow | Not retried |
+
+## Comparing Providers
+
+| Feature | Claude (SDK) | Anthropic | Gemini | OpenRouter |
+|---------|-------------|-----------|--------|------------|
+| **Auth** | OAuth/subscription | API key | API key | API key |
+| **Models** | Claude only | Anthropic-compatible | Gemini only | 100+ models |
+| **Custom endpoint** | No | Yes | No | Yes (OpenAI-compatible) |
+| **Context window** | Automatic | Per-model limit | Per-model limit | Per-model limit |
+| **On error** | Throws | Throws | Throws | Throws |
+
+<Tip>
+**Recommendation**: Use the `anthropic` provider when you need a custom endpoint. For official Anthropic API access with Claude models, the `claude` provider (SDK) is simpler. For non-Anthropic models, use `openrouter` (OpenAI-compatible) or `gemini`.
+</Tip>
+
+## Troubleshooting
+
+### "Anthropic API key not configured"
+
+Either:
+- Set `CLAUDE_MEM_ANTHROPIC_API_KEY` in `~/.claude-mem/settings.json`
+- Set the `ANTHROPIC_API_KEY` environment variable
+
+### Connection Errors
+
+If you see connection errors:
+- Verify the base URL is correct and reachable
+- Check that the endpoint implements the Anthropic Messages API format
+- Test with `curl`:
+
+```bash
+curl -X POST https://your-endpoint.example.com/v1/messages \
+  -H "x-api-key: your-key" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4-6","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}'
+```
+
+### Model Not Found
+
+Verify the model ID is valid for your endpoint:
+- Check your provider's supported models
+- Model IDs must be supported by the endpoint
+
+### Rate Limiting
+
+If you hit rate limits:
+- The provider throws and leaves the message pending for retry
+- Consider adding a retry delay or switching to a less constrained model
+
+## Next Steps
+
+- [Configuration](/configuration) - Full settings reference
+- [OpenRouter Provider](/usage/openrouter-provider) - Alternative provider with 100+ models
+- [Getting Started](/usage/getting-started) - Basic usage guide

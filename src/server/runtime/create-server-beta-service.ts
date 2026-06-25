@@ -252,8 +252,11 @@ function buildServerGenerationProviderFromEnv(): ServerGenerationProvider | null
     if (provider === 'claude' || provider === 'anthropic') {
       const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env.CLAUDE_MEM_ANTHROPIC_API_KEY ?? '';
       if (!apiKey) return null;
-      const opts: { apiKey: string; model?: string } = { apiKey };
+      const opts: { apiKey: string; model?: string; baseUrl?: string } = { apiKey };
       if (process.env.CLAUDE_MEM_SERVER_MODEL) opts.model = process.env.CLAUDE_MEM_SERVER_MODEL;
+      // Optional custom Anthropic-compatible endpoint base URL.
+      const baseUrl = process.env.CLAUDE_MEM_ANTHROPIC_BASE_URL ?? process.env.ANTHROPIC_BASE_URL;
+      if (baseUrl) opts.baseUrl = baseUrl;
       return new ClaudeObservationProvider(opts);
     }
     if (provider === 'gemini') {

@@ -10,6 +10,7 @@ import { DatabaseManager } from '../../DatabaseManager.js';
 import { ClaudeProvider } from '../../ClaudeProvider.js';
 import { GeminiProvider, isGeminiSelected, isGeminiAvailable } from '../../GeminiProvider.js';
 import { OpenRouterProvider, isOpenRouterSelected, isOpenRouterAvailable } from '../../OpenRouterProvider.js';
+import { AnthropicApiProvider, isAnthropicSelected, isAnthropicAvailable } from '../../AnthropicApiProvider.js';
 import type { WorkerService } from '../../../worker-service.js';
 import { BaseRouteHandler } from '../BaseRouteHandler.js';
 import { SessionEventBroadcaster } from '../../events/SessionEventBroadcaster.js';
@@ -53,6 +54,7 @@ export class SessionRoutes extends BaseRouteHandler {
     private sdkAgent: ClaudeProvider,
     private geminiAgent: GeminiProvider,
     private openRouterAgent: OpenRouterProvider,
+    private anthropicAgent: AnthropicApiProvider,
     private eventBroadcaster: SessionEventBroadcaster,
     private workerService: WorkerService,
     private completionHandler: SessionCompletionHandler,
@@ -60,7 +62,15 @@ export class SessionRoutes extends BaseRouteHandler {
     super();
   }
 
-  private getActiveAgent(): ClaudeProvider | GeminiProvider | OpenRouterProvider {
+  private getActiveAgent(): ClaudeProvider | GeminiProvider | OpenRouterProvider | AnthropicApiProvider {
+    if (isAnthropicSelected()) {
+      if (isAnthropicAvailable()) {
+        logger.debug('SESSION', 'Using Anthropic API agent');
+        return this.anthropicAgent;
+      } else {
+        throw new Error('Anthropic provider selected but no API key configured. Set CLAUDE_MEM_ANTHROPIC_API_KEY in settings or ANTHROPIC_API_KEY environment variable.');
+      }
+    }
     if (isOpenRouterSelected()) {
       if (isOpenRouterAvailable()) {
         logger.debug('SESSION', 'Using OpenRouter agent');
@@ -80,7 +90,10 @@ export class SessionRoutes extends BaseRouteHandler {
     return this.sdkAgent;
   }
 
-  private getSelectedProvider(): 'claude' | 'gemini' | 'openrouter' {
+  private getSelectedProvider(): 'claude' | 'gemini' | 'openrouter' | 'anthropic' {
+    if (isAnthropicSelected() && isAnthropicAvailable()) {
+      return 'anthropic';
+    }
     if (isOpenRouterSelected() && isOpenRouterAvailable()) {
       return 'openrouter';
     }
@@ -113,7 +126,7 @@ export class SessionRoutes extends BaseRouteHandler {
 
   private async startGeneratorWithProvider(
     session: ReturnType<typeof this.sessionManager.getSession>,
-    provider: 'claude' | 'gemini' | 'openrouter',
+    provider: 'claude' | 'gemini' | 'openrouter' | 'anthropic',
     source: string
   ): Promise<void> {
     if (!session) return;
@@ -123,6 +136,22 @@ export class SessionRoutes extends BaseRouteHandler {
         sessionId: session.sessionDbId
       });
       session.abortController = new AbortController();
+    }
+
+    if (provider === 'anthropic') {
+      session.generatorPromise = this.anthropicAgent.startSession(session, this.workerService)
+        .catch(async error => {
+          if (session.abortController.signal.aborted) {
+            logger.debug('HTTP', 'Generator catch: ignoring error after abort', { sessionId: session.sessionDbId });
+            return;
+          }
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          logger.failure('SESSION', `Anthropic API agent error`, { sessionId: session.sessionDbId, error: errorMsg });
+        });
+      session.currentProvider = provider;
+      session.lastGeneratorActivity = Date.now();
+      session.lastGeneratorSource = source;
+      return;
     }
 
     const agent = provider === 'openrouter' ? this.openRouterAgent : (provider === 'gemini' ? this.geminiAgent : this.sdkAgent);

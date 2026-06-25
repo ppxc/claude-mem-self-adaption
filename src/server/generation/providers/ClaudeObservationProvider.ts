@@ -25,6 +25,8 @@ const DEFAULT_MODEL = DEFAULT_SERVER_CLAUDE_MODEL;
 export interface ClaudeObservationProviderOptions {
   apiKey: string;
   model?: string;
+  /** Optional custom base URL for Anthropic-compatible endpoints (e.g. a proxy or third-party service). */
+  baseUrl?: string;
   maxOutputTokens?: number;
   fetchImpl?: typeof fetch;
 }
@@ -39,6 +41,7 @@ export class ClaudeObservationProvider implements ServerGenerationProvider {
   readonly providerLabel = 'claude' as const;
   private readonly apiKey: string;
   private readonly model: string;
+  private readonly apiUrl: string;
   private readonly maxOutputTokens: number;
   private readonly fetchImpl: typeof fetch;
 
@@ -53,6 +56,11 @@ export class ClaudeObservationProvider implements ServerGenerationProvider {
     this.model = options.model ?? DEFAULT_MODEL;
     this.maxOutputTokens = options.maxOutputTokens ?? 4096;
     this.fetchImpl = options.fetchImpl ?? fetch;
+    // Use custom baseUrl if provided, otherwise default to api.anthropic.com.
+    // Strip trailing slash for consistent URL construction.
+    this.apiUrl = options.baseUrl
+      ? `${options.baseUrl.replace(/\/+$/, '')}/v1/messages`
+      : ANTHROPIC_API_URL;
   }
 
   async generate(
@@ -72,7 +80,7 @@ export class ClaudeObservationProvider implements ServerGenerationProvider {
 
     let response: Response;
     try {
-      response = await this.fetchImpl(ANTHROPIC_API_URL, {
+      response = await this.fetchImpl(this.apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
