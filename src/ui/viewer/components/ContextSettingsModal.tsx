@@ -340,6 +340,7 @@ export function ContextSettingsModal({
                   <option value="claude">Claude (uses your Claude account)</option>
                   <option value="gemini">Gemini (uses API key)</option>
                   <option value="openrouter">OpenRouter (multi-model)</option>
+                  <option value="anthropic">Anthropic (custom endpoint)</option>
                 </select>
               </FormField>
 
@@ -441,6 +442,44 @@ export function ContextSettingsModal({
                       value={formState.CLAUDE_MEM_OPENROUTER_APP_NAME || 'claude-mem'}
                       onChange={(e) => updateSetting('CLAUDE_MEM_OPENROUTER_APP_NAME', e.target.value)}
                       placeholder="claude-mem"
+                    />
+                  </FormField>
+                </>
+              )}
+
+              {formState.CLAUDE_MEM_PROVIDER === 'anthropic' && (
+                <>
+                  <FormField
+                    label="Anthropic API Key"
+                    tooltip="Your Anthropic API key (or set ANTHROPIC_API_KEY env var)"
+                  >
+                    <input
+                      type="password"
+                      value={formState.CLAUDE_MEM_ANTHROPIC_API_KEY || ''}
+                      onChange={(e) => updateSetting('CLAUDE_MEM_ANTHROPIC_API_KEY', e.target.value)}
+                      placeholder="Enter Anthropic API key..."
+                    />
+                  </FormField>
+                  <FormField
+                    label="Model"
+                    tooltip="Model identifier for the Anthropic endpoint"
+                  >
+                    <input
+                      type="text"
+                      value={formState.CLAUDE_MEM_ANTHROPIC_MODEL || 'claude-sonnet-4-6'}
+                      onChange={(e) => updateSetting('CLAUDE_MEM_ANTHROPIC_MODEL', e.target.value)}
+                      placeholder="e.g., claude-sonnet-4-6"
+                    />
+                  </FormField>
+                  <FormField
+                    label="Custom Base URL (Optional)"
+                    tooltip="Custom Anthropic-compatible endpoint URL (e.g., https://your-proxy.com). Leave empty for official api.anthropic.com"
+                  >
+                    <input
+                      type="text"
+                      value={formState.CLAUDE_MEM_ANTHROPIC_BASE_URL || ''}
+                      onChange={(e) => updateSetting('CLAUDE_MEM_ANTHROPIC_BASE_URL', e.target.value)}
+                      placeholder="https://api.anthropic.com"
                     />
                   </FormField>
                 </>
